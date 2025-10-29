@@ -60,7 +60,13 @@ export class RealVertexAIClient {
       // Record cost
       await this.costLimiter.recordCost(estimatedCost);
 
-      return response.text;
+      // Handle different response formats
+      const text = response.text || response.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) {
+        throw new Error('No text content found in Vertex AI response');
+      }
+      
+      return { text };
     } catch (error) {
       console.error('[VertexAI] Error generating text:', error);
       throw error;
