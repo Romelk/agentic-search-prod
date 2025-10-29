@@ -66,7 +66,7 @@ export class RealVertexAIClient {
         throw new Error('No text content found in Vertex AI response');
       }
       
-      return { text };
+      return text;
     } catch (error) {
       console.error('[VertexAI] Error generating text:', error);
       throw error;

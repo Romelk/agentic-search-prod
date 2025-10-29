@@ -43,7 +43,7 @@ export class NoriClarifier {
     
     try {
       const result = await this.vertexAIClient.generateText(prompt);
-      const clarification = this.parseClarificationResponse(result.text, queryIntent);
+      const clarification = this.parseClarificationResponse(result, queryIntent);
       
       console.log(`[Nori] Generated ${clarification.questions.length} clarification questions`);
       return clarification;

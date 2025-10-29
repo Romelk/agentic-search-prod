@@ -30,7 +30,7 @@ export class IvyInterpreter {
     
     try {
       const result = await this.vertexAIClient.generateText(prompt);
-      const intent = this.parseIntentResponse(result.text, query);
+      const intent = this.parseIntentResponse(result, query);
       
       console.log(`[Ivy] Intent analysis complete: ${intent.intentType} (confidence: ${intent.confidence})`);
       return intent;

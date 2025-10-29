@@ -27,7 +27,7 @@ export class VogueTrendWhisperer {
     try {
       const prompt = this.buildTrendAnalysisPrompt(contextualQuery);
       const result = await this.vertexAIClient.generateText(prompt);
-      const trendData = this.parseTrendResponse(result.text);
+      const trendData = this.parseTrendResponse(result);
 
       const trendEnrichedQuery: TrendEnrichedQuery = {
         contextual: contextualQuery,

@@ -73,7 +73,7 @@ export class GaleContextKeeper {
     
     try {
       const result = await this.vertexAIClient.generateText(prompt);
-      const additional = this.parseContextResponse(result.text);
+      const additional = this.parseContextResponse(result);
       
       return {
         location,
