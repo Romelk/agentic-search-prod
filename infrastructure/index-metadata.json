@@ -1,0 +1,15 @@
+{
+  "contentsDeltaUri": "gs://future-of-search-products-central1/matching-engine/",
+  "isCompleteOverwrite": false,
+  "config": {
+    "dimensions": 768,
+    "distanceMeasureType": "DOT_PRODUCT_DISTANCE",
+    "approximateNeighborsCount": 10,
+    "algorithmConfig": {
+      "treeAhConfig": {
+        "leafNodeEmbeddingCount": 500,
+        "leafNodesToSearchPercent": 7
+      }
+    }
+  }
+}

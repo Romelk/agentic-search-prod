@@ -1,0 +1,382 @@
+openapi: 3.0.3
+info:
+  title: Agentic Search API
+  description: Production-quality agentic search system with LangGraph orchestration
+  version: 1.0.0
+  contact:
+    email: alfaromeo.romel@gmail.com
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+  - url: https://orchestrator-{project}.run.app
+    description: Production (Cloud Run)
+
+paths:
+  /api/v1/search:
+    post:
+      summary: Execute agentic search
+      operationId: search
+      tags:
+        - Search
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRequest'
+      responses:
+        '200':
+          description: Successful search
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Budget exceeded or rate limited
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/clarify:
+    post:
+      summary: Get clarification questions
+      operationId: clarify
+      tags:
+        - Search
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                  example: "I need a nice dress for a summer evening party"
+      responses:
+        '200':
+          description: Clarification questions generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClarificationRequest'
+
+  /api/v1/health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      tags:
+        - System
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  timestamp:
+                    type: integer
+                    format: int64
+                  services:
+                    type: object
+                    additionalProperties:
+                      type: string
+
+  /api/v1/cost/metrics:
+    get:
+      summary: Get cost metrics
+      operationId: getCostMetrics
+      tags:
+        - Monitoring
+      responses:
+        '200':
+          description: Cost metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  daily_spend:
+                    type: number
+                    format: double
+                  daily_budget:
+                    type: number
+                    format: double
+                  remaining_budget:
+                    type: number
+                    format: double
+                  query_count:
+                    type: integer
+                  kill_switch_active:
+                    type: boolean
+
+components:
+  schemas:
+    SearchRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          example: "I need a nice dress for a summer evening party"
+        max_results:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 10
+        filters:
+          type: object
+          additionalProperties:
+            type: string
+        user_context:
+          type: object
+          additionalProperties:
+            type: string
+
+    SearchResponse:
+      type: object
+      properties:
+        ui_response:
+          $ref: '#/components/schemas/FinalUIResponse'
+        estimated_cost:
+          type: number
+          format: double
+        request_id:
+          type: string
+
+    FinalUIResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/RankedLook'
+        execution_traces:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentExecutionTrace'
+        query_id:
+          type: string
+        total_execution_time_ms:
+          type: integer
+          format: int64
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+        success:
+          type: boolean
+        error_message:
+          type: string
+
+    RankedLook:
+      type: object
+      properties:
+        look:
+          $ref: '#/components/schemas/LookBundle'
+        final_score:
+          type: number
+          format: double
+        score_breakdown:
+          type: object
+          additionalProperties:
+            type: number
+        rank:
+          type: integer
+
+    LookBundle:
+      type: object
+      properties:
+        bundle_id:
+          type: string
+        bundle_name:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchCandidate'
+        coherence_score:
+          type: number
+        style_theme:
+          type: string
+        description:
+          type: string
+
+    SearchCandidate:
+      type: object
+      properties:
+        product:
+          $ref: '#/components/schemas/Product'
+        similarity_score:
+          type: number
+        matching_attributes:
+          type: array
+          items:
+            type: string
+        match_reason:
+          type: string
+
+    Product:
+      type: object
+      properties:
+        sku:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+          format: double
+        currency:
+          type: string
+        category:
+          type: string
+        subcategory:
+          type: string
+        brand:
+          type: string
+        color:
+          type: string
+        size:
+          type: string
+        material:
+          type: string
+        style_tags:
+          type: array
+          items:
+            type: string
+        season:
+          type: string
+        gender:
+          type: string
+        occasion:
+          type: string
+        image_url:
+          type: string
+        stock_status:
+          type: string
+        rating:
+          type: number
+        popularity_score:
+          type: number
+
+    AgentExecutionTrace:
+      type: object
+      properties:
+        agent_name:
+          type: string
+        action:
+          type: string
+        start_time:
+          type: integer
+          format: int64
+        end_time:
+          type: integer
+          format: int64
+        execution_time_ms:
+          type: number
+        status:
+          type: string
+          enum: [success, error, timeout]
+        input_summary:
+          type: string
+        output_summary:
+          type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+
+    ClarificationRequest:
+      type: object
+      properties:
+        needs_clarification:
+          type: boolean
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/DynamicQuestion'
+        message:
+          type: string
+        context:
+          $ref: '#/components/schemas/QueryIntent'
+
+    DynamicQuestion:
+      type: object
+      properties:
+        question:
+          type: string
+        question_type:
+          type: string
+        options:
+          type: array
+          items:
+            type: string
+        context_explanation:
+          type: string
+        required:
+          type: boolean
+        priority:
+          type: integer
+
+    QueryIntent:
+      type: object
+      properties:
+        original_query:
+          type: string
+        intent_type:
+          type: string
+        detected_entities:
+          type: array
+          items:
+            type: string
+        attributes:
+          type: object
+          additionalProperties:
+            type: string
+        tone:
+          type: string
+        confidence:
+          type: number
+        timestamp:
+          type: integer
+          format: int64
+
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties:
+            type: string
+
+

@@ -1,0 +1,113 @@
+# Vector Search Service Configuration
+
+server:
+  port: 8082
+  error:
+    include-message: always
+    include-binding-errors: always
+
+spring:
+  application:
+    name: vector-search-service
+  
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:development}
+  
+  # Redis Configuration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      database: 0
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+
+# GCP Configuration
+gcp:
+  project-id: ${GCP_PROJECT_ID:future-of-search}
+  region: ${GCP_REGION:us-central1}
+
+# Vertex AI Configuration
+vertex-ai:
+  endpoint-id: ${VERTEX_AI_ENDPOINT_ID:}
+  index-id: ${VERTEX_AI_INDEX_ID:}
+  deployed-index-id: ${VERTEX_AI_DEPLOYED_INDEX_ID:}
+  timeout-seconds: ${VERTEX_AI_TIMEOUT_SECONDS:30}
+
+# Cost Control Configuration
+cost:
+  daily-budget-usd: ${DAILY_BUDGET_USD:8.0}
+  kill-switch: ${VERTEX_AI_KILL_SWITCH:true}
+  max-query-cost-usd: ${MAX_QUERY_COST_USD:0.50}
+
+# Resilience4j Circuit Breaker Configuration
+resilience4j:
+  circuitbreaker:
+    instances:
+      vertex-ai:
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+
+# Logging Configuration
+logging:
+  level:
+    com.agenticsearch.vectorsearch: INFO
+    com.google.cloud.aiplatform: WARN
+    io.netty: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Management endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  health:
+    redis:
+      enabled: true
+
+---
+# Development Profile
+spring:
+  config:
+    activate:
+      on-profile: development
+
+logging:
+  level:
+    com.agenticsearch.vectorsearch: DEBUG
+    org.springframework.web.reactive: DEBUG
+
+---
+# Production Profile
+spring:
+  config:
+    activate:
+      on-profile: production
+
+logging:
+  level:
+    com.agenticsearch.vectorsearch: INFO
+    com.google.cloud.aiplatform: WARN
+    org.springframework.web.reactive: WARN
+
+# Production-specific configurations
+server:
+  compression:
+    enabled: true
+  http2:
+    enabled: true
+

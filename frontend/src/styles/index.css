@@ -1,0 +1,314 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Apple-inspired base styles */
+@layer base {
+  html {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  body {
+    @apply bg-apple-background text-apple-accent;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+  }
+  
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  /* Focus styles (Apple-style) */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-apple-primary ring-offset-2 ring-offset-apple-background;
+  }
+  
+  /* Selection styles */
+  ::selection {
+    @apply bg-apple-primary/20 text-apple-accent;
+  }
+}
+
+@layer components {
+  /* Glass morphism effect - Apple style */
+  .glass {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  
+  .glass-dark {
+    background: rgba(29, 29, 31, 0.8);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  /* Apple-style buttons with fluid animations */
+  .btn-primary {
+    @apply bg-apple-primary text-white px-6 py-3 rounded-full font-medium shadow-sm;
+    transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+    transform-origin: center;
+  }
+  
+  .btn-primary:hover {
+    background: #0056b3;
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 0 8px 25px rgba(0, 113, 227, 0.3);
+  }
+  
+  .btn-primary:active {
+    transform: translateY(0) scale(0.98);
+    transition: all 0.1s ease-out;
+  }
+  
+  .btn-secondary {
+    @apply bg-white text-apple-accent px-6 py-3 rounded-full font-medium shadow-sm border border-gray-200;
+    transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+    transform-origin: center;
+  }
+  
+  .btn-secondary:hover {
+    background: #f9fafb;
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  }
+  
+  .btn-secondary:active {
+    transform: translateY(0) scale(0.98);
+    transition: all 0.1s ease-out;
+  }
+  
+  .btn-ghost {
+    @apply text-apple-secondary px-4 py-2 rounded-full font-medium;
+    transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+  
+  .btn-ghost:hover {
+    @apply bg-white/50;
+    transform: scale(1.05);
+  }
+  
+  .btn-ghost:active {
+    transform: scale(0.95);
+    transition: all 0.1s ease-out;
+  }
+  
+  /* Apple-style cards */
+  .card {
+    @apply bg-white rounded-2xl shadow-apple border border-gray-100/50;
+  }
+  
+  .card-hover {
+    @apply card transition-all duration-300 hover:shadow-apple-lg hover:-translate-y-1;
+  }
+  
+  /* Typography */
+  .heading-1 {
+    @apply text-4xl font-bold text-apple-accent leading-tight;
+  }
+  
+  .heading-2 {
+    @apply text-3xl font-semibold text-apple-accent leading-tight;
+  }
+  
+  .heading-3 {
+    @apply text-2xl font-semibold text-apple-accent leading-tight;
+  }
+  
+  .text-body {
+    @apply text-base text-apple-secondary leading-relaxed;
+  }
+  
+  .text-caption {
+    @apply text-sm text-apple-secondary;
+  }
+  
+  /* Input styles */
+  .input-apple {
+    @apply w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-apple-accent placeholder-apple-secondary transition-all duration-200 focus:border-apple-primary focus:ring-2 focus:ring-apple-primary/20;
+  }
+  
+  /* Segmented control (Apple-style) */
+  .segmented-control {
+    @apply bg-gray-100 rounded-full p-1 flex;
+  }
+  
+  .segmented-control-option {
+    @apply px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 cursor-pointer;
+  }
+  
+  .segmented-control-option.active {
+    @apply bg-white text-apple-accent shadow-sm;
+  }
+  
+  .segmented-control-option:not(.active) {
+    @apply text-apple-secondary hover:text-apple-accent;
+  }
+}
+
+@layer utilities {
+  /* Holographic effects for sci-fi mode */
+  .holographic {
+    @apply animate-holographic;
+    background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%);
+    background-size: 200% 200%;
+  }
+  
+  .holographic-scan {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .holographic-scan::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    animation: scan 3s linear infinite;
+  }
+  
+  @keyframes scan {
+    0% { left: -100%; }
+    100% { left: 100%; }
+  }
+  
+  /* Neural network effect */
+  .neural-grid {
+    background-image: 
+      radial-gradient(circle at 25% 25%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 75% 75%, rgba(59, 130, 246, 0.1) 0%, transparent 50%);
+    background-size: 100px 100px;
+    animation: neuralPulse 4s ease-in-out infinite;
+  }
+  
+  /* Particle effects */
+  .particles {
+    position: relative;
+  }
+  
+  .particles::before,
+  .particles::after {
+    content: '';
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: rgba(59, 130, 246, 0.6);
+    border-radius: 50%;
+    animation: float 6s ease-in-out infinite;
+  }
+  
+  .particles::before {
+    top: 20%;
+    left: 20%;
+    animation-delay: -2s;
+  }
+  
+  .particles::after {
+    top: 60%;
+    right: 20%;
+    animation-delay: -4s;
+  }
+  
+  @keyframes float {
+    0%, 100% { transform: translateY(0px) scale(1); opacity: 0.6; }
+    50% { transform: translateY(-20px) scale(1.2); opacity: 1; }
+  }
+  
+  /* Apple-style smooth transitions */
+  .transition-apple {
+    transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+  
+  .transition-apple-fast {
+    transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+  
+  .transition-apple-slow {
+    transition: all 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+  
+  /* Apple-style hover effects */
+  .hover-lift {
+    transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+  
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  }
+  
+  /* Apple-style focus states */
+  .focus-apple:focus {
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.2);
+    border-color: #0071e3;
+  }
+  
+  /* Hide scrollbars but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Custom scrollbar for visible areas */
+  .scrollbar-apple::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .scrollbar-apple::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scrollbar-apple::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 3px;
+  }
+  
+  .scrollbar-apple::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.2);
+  }
+}
+
+/* Responsive design helpers */
+@media (max-width: 768px) {
+  .heading-1 {
+    @apply text-3xl;
+  }
+  
+  .heading-2 {
+    @apply text-2xl;
+  }
+  
+  .heading-3 {
+    @apply text-xl;
+  }
+}
+
+/* Dark mode support (future enhancement) */
+@media (prefers-color-scheme: dark) {
+  .dark-mode {
+    @apply bg-gray-900 text-white;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

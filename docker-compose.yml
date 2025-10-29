@@ -1,0 +1,169 @@
+version: '3.8'
+
+services:
+  # Redis for cost tracking and rate limiting
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # PostgreSQL for metadata (optional)
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: agentic_search
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d agentic_search"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Orchestrator Service (Node.js + LangGraph)
+  orchestrator:
+    build:
+      context: ./services/orchestrator
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=development
+      - PORT=8080
+      - REDIS_URL=redis://redis:6379
+      - VERTEX_AI_KILL_SWITCH=true
+      - DAILY_BUDGET_USD=15
+      - QUERY_PROCESSOR_URL=http://query-processor:8081
+      - VECTOR_SEARCH_URL=http://vector-search:8082
+      - RESPONSE_PIPELINE_URL=http://response-pipeline:8083
+    depends_on:
+      - redis
+    volumes:
+      - ./services/orchestrator:/app
+      - /app/node_modules
+    command: npm run dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Query Processor Service (Node.js AI agents)
+  query-processor:
+    build:
+      context: ./services/query-processor
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - NODE_ENV=development
+      - PORT=8081
+      - REDIS_URL=redis://redis:6379
+      - VERTEX_AI_KILL_SWITCH=true
+      - DAILY_BUDGET_USD=5
+      - GCP_PROJECT_ID=future-of-search
+      - GCP_REGION=us-central1
+    depends_on:
+      - redis
+    volumes:
+      - ./services/query-processor:/app
+      - /app/node_modules
+    command: npm run dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Vector Search Service (Java Spring Boot)
+  vector-search:
+    build:
+      context: ./services/vector-search
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=development
+      - SERVER_PORT=8082
+      - REDIS_URL=redis://redis:6379
+      - VERTEX_AI_KILL_SWITCH=true
+      - DAILY_BUDGET_USD=8
+      - GCP_PROJECT_ID=future-of-search
+      - GCP_REGION=us-central1
+    depends_on:
+      - redis
+    volumes:
+      - ./services/vector-search:/app
+    command: ./gradlew bootRun
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Response Pipeline Service (Java Spring Boot)
+  response-pipeline:
+    build:
+      context: ./services/response-pipeline
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_PROFILES_ACTIVE=development
+      - SERVER_PORT=8083
+      - REDIS_URL=redis://redis:6379
+      - VERTEX_AI_KILL_SWITCH=true
+      - DAILY_BUDGET_USD=2
+    depends_on:
+      - redis
+    volumes:
+      - ./services/response-pipeline:/app
+    command: ./gradlew bootRun
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8080
+      - VITE_GRAPH_VIZ_URL=http://localhost:8080/api/v1/graph
+    depends_on:
+      - orchestrator
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  redis_data:
+  postgres_data:
+
+networks:
+  default:
+    name: agentic-search-network
+

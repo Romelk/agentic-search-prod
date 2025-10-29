@@ -1,0 +1,13 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: response-pipeline
+  redis:
+    host: localhost
+    port: 6379
+
+cost:
+  kill-switch: false
+  daily-budget: 2

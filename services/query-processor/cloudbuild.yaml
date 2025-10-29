@@ -1,0 +1,11 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '-t', 'gcr.io/future-of-search/query-processor',
+      '-f', 'services/query-processor/Dockerfile',
+      '--build-arg', 'SERVICE_DIR=services/query-processor',
+      '.'
+    ]
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/future-of-search/query-processor']

@@ -1,0 +1,157 @@
+syntax = "proto3";
+
+package agentic.search.schema;
+
+// Product model
+message Product {
+  string sku = 1;
+  string name = 2;
+  string description = 3;
+  double price = 4;
+  string currency = 5;
+  string category = 6;
+  string subcategory = 7;
+  string brand = 8;
+  string color = 9;
+  string size = 10;
+  string material = 11;
+  repeated string style_tags = 12;
+  string season = 13;
+  string gender = 14;
+  string occasion = 15;
+  string image_url = 16;
+  string stock_status = 17;
+  double rating = 18;
+  double popularity_score = 19;
+}
+
+// Query Intent
+message QueryIntent {
+  string original_query = 1;
+  string intent_type = 2;
+  repeated string detected_entities = 3;
+  map<string, string> attributes = 4;
+  string tone = 5;
+  double confidence = 6;
+  int64 timestamp = 7;
+}
+
+// Clarified Query
+message ClarifiedQuery {
+  QueryIntent intent = 1;
+  map<string, string> clarifications = 2;
+  repeated string inferred_preferences = 3;
+  bool needs_more_info = 4;
+}
+
+// Contextual Query
+message ContextualQuery {
+  ClarifiedQuery clarified = 1;
+  string location = 2;
+  string weather = 3;
+  string season = 4;
+  string time_of_day = 5;
+  map<string, string> environmental_context = 6;
+}
+
+// Trend Enriched Query
+message TrendEnrichedQuery {
+  ContextualQuery contextual = 1;
+  repeated string trending_styles = 2;
+  repeated string seasonal_recommendations = 3;
+  double trend_confidence = 4;
+}
+
+// Search Candidate
+message SearchCandidate {
+  Product product = 1;
+  double similarity_score = 2;
+  repeated string matching_attributes = 3;
+  string match_reason = 4;
+}
+
+// Look Bundle
+message LookBundle {
+  string bundle_id = 1;
+  string bundle_name = 2;
+  repeated SearchCandidate items = 3;
+  double coherence_score = 4;
+  string style_theme = 5;
+  string description = 6;
+}
+
+// Ranked Look
+message RankedLook {
+  LookBundle look = 1;
+  double final_score = 2;
+  map<string, double> score_breakdown = 3;
+  int32 rank = 4;
+}
+
+// Agent Execution Trace
+message AgentExecutionTrace {
+  string agent_name = 1;
+  string action = 2;
+  int64 start_time = 3;
+  int64 end_time = 4;
+  double execution_time_ms = 5;
+  string status = 6;
+  string input_summary = 7;
+  string output_summary = 8;
+  map<string, string> metadata = 9;
+}
+
+// Final UI Response
+message FinalUIResponse {
+  repeated RankedLook results = 1;
+  repeated AgentExecutionTrace execution_traces = 2;
+  string query_id = 3;
+  int64 total_execution_time_ms = 4;
+  map<string, string> metadata = 5;
+  bool success = 6;
+  string error_message = 7;
+}
+
+// Search Request (API input)
+message SearchRequest {
+  string query = 1;
+  int32 max_results = 2;
+  map<string, string> filters = 3;
+  map<string, string> user_context = 4;
+}
+
+// Search Response (API output)
+message SearchResponse {
+  FinalUIResponse ui_response = 1;
+  double estimated_cost = 2;
+  string request_id = 3;
+}
+
+// Cost tracking
+message CostMetrics {
+  string service_name = 1;
+  double cost_usd = 2;
+  int32 api_calls = 3;
+  int64 timestamp = 4;
+  string operation_type = 5;
+}
+
+// Dynamic Question (for Nori)
+message DynamicQuestion {
+  string question = 1;
+  string question_type = 2;
+  repeated string options = 3;
+  string context_explanation = 4;
+  bool required = 5;
+  int32 priority = 6;
+}
+
+// Clarification Request
+message ClarificationRequest {
+  bool needs_clarification = 1;
+  repeated DynamicQuestion questions = 2;
+  string message = 3;
+  QueryIntent context = 4;
+}
+
+

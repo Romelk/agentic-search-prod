@@ -1,0 +1,12 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '-t', 'gcr.io/future-of-search/frontend',
+      '--build-arg', 'VITE_API_BASE_URL=https://simple-orchestrator-188396315187.us-central1.run.app',
+      '.'
+    ]
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/future-of-search/frontend']
+images:
+  - 'gcr.io/future-of-search/frontend'
