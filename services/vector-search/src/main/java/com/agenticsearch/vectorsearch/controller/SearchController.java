@@ -11,6 +11,7 @@ package com.agenticsearch.vectorsearch.controller;
 
 import com.agenticsearch.vectorsearch.config.CostGuard;
 import com.agenticsearch.vectorsearch.model.SearchCandidate;
+import com.agenticsearch.vectorsearch.model.TrendSignals;
 import com.agenticsearch.vectorsearch.service.KikoCuratorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,8 +56,9 @@ public class SearchController {
         
         int maxResults = request.getMaxResults() != null ? request.getMaxResults() : 10;
         Map<String, String> filters = request.getFilters() != null ? request.getFilters() : new HashMap<>();
+        TrendSignals trendSignals = request.resolveTrendSignals();
         
-        return kikoCuratorService.searchSemantic(request.getQuery(), maxResults, filters)
+        return kikoCuratorService.searchSemantic(request.getQuery(), maxResults, filters, trendSignals)
             .map(candidates -> {
                 double estimatedCost = costGuard.estimateQueryCost(1);
                 
@@ -140,6 +143,8 @@ public class SearchController {
         private String query;
         private Integer maxResults;
         private Map<String, String> filters;
+        private TrendEnrichedQueryPayload trendEnrichedQuery;
+        private TrendSignals trendSignals;
         
         // Constructors
         public SearchRequest() {}
@@ -159,6 +164,86 @@ public class SearchController {
         
         public Map<String, String> getFilters() { return filters; }
         public void setFilters(Map<String, String> filters) { this.filters = filters; }
+        
+        public TrendEnrichedQueryPayload getTrendEnrichedQuery() { return trendEnrichedQuery; }
+        public void setTrendEnrichedQuery(TrendEnrichedQueryPayload trendEnrichedQuery) { this.trendEnrichedQuery = trendEnrichedQuery; }
+        
+        public TrendSignals getTrendSignals() { return trendSignals; }
+        public void setTrendSignals(TrendSignals trendSignals) { this.trendSignals = trendSignals; }
+        
+        public TrendSignals resolveTrendSignals() {
+            if (trendSignals != null) {
+                return trendSignals;
+            }
+            if (trendEnrichedQuery != null) {
+                return trendEnrichedQuery.toTrendSignals();
+            }
+            return null;
+        }
+        
+        @Override
+        public String toString() {
+            return "SearchRequest{" +
+                "query='" + query + '\'' +
+                ", maxResults=" + maxResults +
+                ", filters=" + filters +
+                ", trendEnrichedQuery=" + (trendEnrichedQuery != null ? "present" : "absent") +
+                '}';
+        }
+        
+        @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
+        public static class TrendEnrichedQueryPayload {
+            private List<String> trendingStyles;
+            private List<String> seasonalRecommendations;
+            private Double trendConfidence;
+            private ContextualPayload contextual;
+            
+            public List<String> getTrendingStyles() { return trendingStyles != null ? trendingStyles : List.of(); }
+            public void setTrendingStyles(List<String> trendingStyles) { this.trendingStyles = trendingStyles; }
+            
+            public List<String> getSeasonalRecommendations() { return seasonalRecommendations != null ? seasonalRecommendations : List.of(); }
+            public void setSeasonalRecommendations(List<String> seasonalRecommendations) { this.seasonalRecommendations = seasonalRecommendations; }
+            
+            public Double getTrendConfidence() { return trendConfidence; }
+            public void setTrendConfidence(Double trendConfidence) { this.trendConfidence = trendConfidence; }
+            
+            public ContextualPayload getContextual() { return contextual; }
+            public void setContextual(ContextualPayload contextual) { this.contextual = contextual; }
+            
+            public TrendSignals toTrendSignals() {
+                TrendSignals signals = new TrendSignals();
+                signals.setTrendingStyles(new ArrayList<>(getTrendingStyles()));
+                signals.setSeasonalRecommendations(new ArrayList<>(getSeasonalRecommendations()));
+                signals.setTrendConfidence(trendConfidence != null ? trendConfidence : 0.0);
+                if (contextual != null) {
+                    signals.setLocation(contextual.getLocation());
+                    signals.setSeason(contextual.getSeason());
+                    signals.setTimeOfDay(contextual.getTimeOfDay());
+                    signals.setContextualMetadata(contextual.getEnvironmentalContext());
+                }
+                return signals;
+            }
+        }
+        
+        @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
+        public static class ContextualPayload {
+            private String location;
+            private String season;
+            private String timeOfDay;
+            private Map<String, String> environmentalContext;
+            
+            public String getLocation() { return location; }
+            public void setLocation(String location) { this.location = location; }
+            
+            public String getSeason() { return season; }
+            public void setSeason(String season) { this.season = season; }
+            
+            public String getTimeOfDay() { return timeOfDay; }
+            public void setTimeOfDay(String timeOfDay) { this.timeOfDay = timeOfDay; }
+            
+            public Map<String, String> getEnvironmentalContext() { return environmentalContext != null ? environmentalContext : Map.of(); }
+            public void setEnvironmentalContext(Map<String, String> environmentalContext) { this.environmentalContext = environmentalContext; }
+        }
     }
     
     /**

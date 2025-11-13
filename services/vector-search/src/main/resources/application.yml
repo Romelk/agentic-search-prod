@@ -37,6 +37,20 @@ vertex-ai:
   index-id: ${VERTEX_AI_INDEX_ID:}
   deployed-index-id: ${VERTEX_AI_DEPLOYED_INDEX_ID:}
   timeout-seconds: ${VERTEX_AI_TIMEOUT_SECONDS:30}
+  embeddings-model: ${VERTEX_AI_EMBEDDINGS_MODEL:text-embedding-005}
+
+# Vector search tuning
+vector-search:
+  max-results-cap: ${VECTOR_SEARCH_MAX_RESULTS_CAP:50}
+  embeddings:
+    enabled: ${VECTOR_SEARCH_EMBEDDINGS_ENABLED:true}
+  trend-weighting:
+    enabled: ${VECTOR_SEARCH_TREND_WEIGHTING_ENABLED:true}
+  cache:
+    embedding-ttl-seconds: ${VECTOR_SEARCH_EMBEDDING_CACHE_TTL_SECONDS:900}
+    embedding-max-size: ${VECTOR_SEARCH_EMBEDDING_CACHE_MAX_SIZE:500}
+    results-ttl-seconds: ${VECTOR_SEARCH_RESULTS_CACHE_TTL_SECONDS:180}
+    results-max-size: ${VECTOR_SEARCH_RESULTS_CACHE_MAX_SIZE:200}
 
 # Cost Control Configuration
 cost:

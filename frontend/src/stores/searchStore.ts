@@ -80,23 +80,41 @@ export const useSearchStore = create<SearchStore>()(
             const currentSessionId = sessionId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             set({ sessionId: currentSessionId }, false, 'executeSearch/session');
 
+            // Convert filters to API format
+            const apiFilters: any = {};
+            if (filters.color) apiFilters.color = filters.color;
+            if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
+              apiFilters.priceRange = [
+                filters.minPrice || 0,
+                filters.maxPrice || 10000
+              ];
+            }
+            if (filters.occasion) apiFilters.occasion = filters.occasion;
+
             // Call orchestrator API
             const apiResponse = await searchApi.search({
               query,
-              filters: filters || {},
+              filters: Object.keys(apiFilters).length > 0 ? apiFilters : undefined,
               maxResults: 10,
             });
 
-            const ui = apiResponse.uiResponse;
-            const results = ui?.results || [];
-            const traces = ui?.executionTraces || apiResponse.stateSummary?.traces || [];
+            // Handle simple orchestrator response format
+            const simpleResponse = apiResponse as any;
+            const results = simpleResponse.results || simpleResponse.uiResponse?.results || [];
+            const traces = simpleResponse.executionTrace 
+              ? [simpleResponse.executionTrace]
+              : simpleResponse.uiResponse?.executionTraces || [];
+            
+            // Extract questions from API response
+            const questions = simpleResponse.questions || [];
 
             set({
               results,
               executionTrace: traces[0],
               loading: false,
-              error: ui?.errorMessage || null,
+              error: null,
               sessionId: currentSessionId,
+              questions,
             }, false, 'executeSearch/success');
 
           } catch (error) {

@@ -14,6 +14,7 @@ package com.agenticsearch.responsepipeline.controller;
 import com.agenticsearch.responsepipeline.model.LookBundle;
 import com.agenticsearch.responsepipeline.model.RankedLook;
 import com.agenticsearch.responsepipeline.model.SearchCandidate;
+import com.agenticsearch.responsepipeline.model.TrendSignals;
 import com.agenticsearch.responsepipeline.service.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +62,11 @@ public class ResponsePipelineController {
             request.getStyleThemes() : List.of("casual", "formal", "mixed");
         int maxBundles = request.getMaxBundles() != null ? request.getMaxBundles() : 5;
         
-        return weaveComposerService.createBundles(request.getSearchCandidates(), styleThemes, maxBundles)
+        return weaveComposerService.createBundles(
+                request.getSearchCandidates(),
+                styleThemes,
+                maxBundles,
+                request.getTrendSignals())
             .map(bundles -> {
                 BundleResponse response = new BundleResponse(
                     "Bundles created successfully",
@@ -222,6 +227,7 @@ public class ResponsePipelineController {
         private List<SearchCandidate> searchCandidates;
         private List<String> styleThemes;
         private Integer maxBundles;
+        private TrendSignals trendSignals;
         
         // Constructors
         public BundleRequest() {}
@@ -241,6 +247,9 @@ public class ResponsePipelineController {
         
         public Integer getMaxBundles() { return maxBundles; }
         public void setMaxBundles(Integer maxBundles) { this.maxBundles = maxBundles; }
+
+        public TrendSignals getTrendSignals() { return trendSignals; }
+        public void setTrendSignals(TrendSignals trendSignals) { this.trendSignals = trendSignals; }
     }
     
     public static class BundleResponse {

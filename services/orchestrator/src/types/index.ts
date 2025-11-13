@@ -107,6 +107,17 @@ export interface QueryIntent {
   tone: string;
   confidence: number;
   timestamp: number;
+  attributeSummary?: AttributeSummary;
+  clarificationSignals?: ClarificationSignals;
+}
+
+export interface AttributeSummary {
+  required: string[];
+  provided: string[];
+  missing: string[];
+  optional?: string[];
+  inferred?: string[];
+  importanceWeights?: Record<string, number>;
 }
 
 export interface ClarifiedQuery {
@@ -132,6 +143,30 @@ export interface TrendEnrichedQuery {
   trendConfidence: number;
 }
 
+export interface TrendSignals {
+  trendingStyles: string[];
+  seasonalRecommendations: string[];
+  trendConfidence: number;
+  season?: string;
+  location?: string;
+  timeOfDay?: string;
+  metadata?: Record<string, string>;
+}
+
+export interface ClarificationSignals {
+  recommended: boolean;
+  confidence: number;
+  reasons: string[];
+  suggestedQuestions?: SuggestedClarification[];
+}
+
+export interface SuggestedClarification {
+  attribute: string;
+  questionType: string;
+  rationale: string;
+  priority: number;
+}
+
 // LangGraph State Interface
 export interface OrchestratorState {
   // Input
@@ -145,9 +180,11 @@ export interface OrchestratorState {
   clarifiedQuery?: ClarifiedQuery;
   contextualQuery?: ContextualQuery;
   trendEnrichedQuery?: TrendEnrichedQuery;
+  trendSignals?: TrendSignals;
   searchCandidates?: SearchCandidate[];
   lookBundles?: LookBundle[];
   rankedLooks?: RankedLook[];
+  validatedLooks?: RankedLook[];
   finalResponse?: FinalUIResponse;
   
   // Execution tracking
@@ -161,6 +198,7 @@ export interface OrchestratorState {
   
   // Metadata
   metadata: Record<string, any>;
+  activeFilters?: Record<string, string>;
 }
 
 // Service endpoints

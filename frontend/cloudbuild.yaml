@@ -10,3 +10,6 @@ steps:
     args: ['push', 'gcr.io/future-of-search/frontend']
 images:
   - 'gcr.io/future-of-search/frontend'
+
+
+

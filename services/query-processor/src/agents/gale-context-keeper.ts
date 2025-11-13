@@ -22,11 +22,15 @@ export class GaleContextKeeper {
    * Enrich clarified query with environmental context
    */
   async enrichContext(clarifiedQuery: ClarifiedQuery): Promise<ContextualQuery> {
-    console.log(`[Gale] Enriching context for: ${clarifiedQuery.intent.originalQuery}`);
+    const originalQuery = clarifiedQuery.intent.originalQuery;
+    console.log(`[Gale] Enriching context for: ${originalQuery}`);
 
     try {
-      // Get environmental context
-      const environmentalContext = await this.getEnvironmentalContext();
+      // Extract location and season from query text first
+      const extractedContext = this.extractContextFromQuery(originalQuery);
+      
+      // Get environmental context (will use extracted values if available)
+      const environmentalContext = await this.getEnvironmentalContext(extractedContext);
       
       const contextualQuery: ContextualQuery = {
         clarified: clarifiedQuery,
@@ -37,7 +41,7 @@ export class GaleContextKeeper {
         environmentalContext: environmentalContext.additional
       };
 
-      console.log(`[Gale] Context enrichment complete: ${environmentalContext.season}, ${environmentalContext.weather}`);
+      console.log(`[Gale] Context enrichment complete: ${environmentalContext.season}, ${environmentalContext.weather}, location: ${environmentalContext.location}`);
       return contextualQuery;
 
     } catch (error) {
@@ -49,9 +53,43 @@ export class GaleContextKeeper {
   }
 
   /**
+   * Extract location and season from query text
+   */
+  private extractContextFromQuery(query: string): { location?: string; season?: string } {
+    const queryLower = query.toLowerCase();
+    const extracted: { location?: string; season?: string } = {};
+    
+    // Common location keywords
+    const locations = [
+      'india', 'usa', 'united states', 'uk', 'united kingdom', 'canada', 'australia',
+      'france', 'germany', 'spain', 'italy', 'japan', 'china', 'brazil', 'mexico',
+      'dubai', 'singapore', 'thailand', 'indonesia', 'philippines', 'malaysia',
+      'new york', 'london', 'paris', 'tokyo', 'mumbai', 'delhi', 'bangalore'
+    ];
+    
+    for (const loc of locations) {
+      if (queryLower.includes(loc)) {
+        extracted.location = loc.charAt(0).toUpperCase() + loc.slice(1);
+        break;
+      }
+    }
+    
+    // Season keywords
+    const seasons = ['summer', 'winter', 'spring', 'fall', 'autumn'];
+    for (const season of seasons) {
+      if (queryLower.includes(season)) {
+        extracted.season = season;
+        break;
+      }
+    }
+    
+    return extracted;
+  }
+
+  /**
    * Get environmental context using AI and system information
    */
-  private async getEnvironmentalContext(): Promise<{
+  private async getEnvironmentalContext(extracted?: { location?: string; season?: string }): Promise<{
     location: string;
     weather: string;
     season: string;
@@ -59,14 +97,16 @@ export class GaleContextKeeper {
     additional: Record<string, string>;
   }> {
     const currentDate = new Date();
-    const season = this.getCurrentSeason(currentDate);
+    
+    // Use extracted season from query, or fallback to current season
+    const season = extracted?.season || this.getCurrentSeason(currentDate);
     const timeOfDay = this.getTimeOfDay(currentDate);
     
-    // Try to get location from environment or use default
-    const location = process.env.USER_LOCATION || 'Unknown';
+    // Use extracted location from query, or environment variable, or default
+    const location = extracted?.location || process.env.USER_LOCATION || 'Unknown';
     
-    // For now, use mock weather data (in production, integrate with weather API)
-    const weather = this.getMockWeather(season, timeOfDay);
+    // Get weather based on extracted season (or current season)
+    const weather = this.getWeatherForSeason(season, timeOfDay);
     
     // Use AI to enhance context understanding
     const prompt = this.buildContextPrompt(location, season, weather, timeOfDay);
@@ -145,7 +185,7 @@ Respond ONLY with valid JSON, no additional text.`;
       // Handle undefined or null response
       if (!response || typeof response !== 'string') {
         console.log('[Gale] Invalid response format, using fallback');
-        return this.createFallbackContext();
+        return this.basicContextFallback();
       }
 
       const jsonMatch = response.match(/\{[\s\S]*\}/);
@@ -167,10 +207,7 @@ Respond ONLY with valid JSON, no additional text.`;
     } catch (error) {
       console.warn('[Gale] Failed to parse context response:', error);
       
-      return {
-        context_note: 'Basic environmental context applied',
-        recommendations: 'Consider seasonal and weather factors'
-      };
+      return this.basicContextFallback();
     }
   }
 
@@ -199,18 +236,21 @@ Respond ONLY with valid JSON, no additional text.`;
   }
 
   /**
-   * Get mock weather based on season and time
+   * Get weather based on season (more appropriate for the season)
    */
-  private getMockWeather(season: string, timeOfDay: string): string {
+  private getWeatherForSeason(season: string, timeOfDay: string): string {
     const weatherMap: Record<string, string[]> = {
       spring: ['sunny', 'partly_cloudy', 'light_rain', 'windy'],
       summer: ['sunny', 'hot', 'humid', 'partly_cloudy'],
       fall: ['cool', 'cloudy', 'rainy', 'windy'],
-      winter: ['cold', 'snowy', 'cloudy', 'clear']
+      winter: ['cold', 'snowy', 'cloudy', 'clear'],
+      autumn: ['cool', 'cloudy', 'rainy', 'windy']
     };
     
-    const weathers = weatherMap[season] || ['mild'];
-    return weathers[Math.floor(Math.random() * weathers.length)];
+    const weathers = weatherMap[season.toLowerCase()] || ['mild'];
+    // Use first weather option as default (most common for season)
+    // In production, you'd integrate with weather API
+    return weathers[0];
   }
 
   /**
@@ -231,6 +271,13 @@ Respond ONLY with valid JSON, no additional text.`;
         context_note: `Basic context: ${season} ${timeOfDay}`,
         recommendations: 'Consider seasonal appropriateness'
       }
+    };
+  }
+
+  private basicContextFallback(): Record<string, string> {
+    return {
+      context_note: 'Basic environmental context applied',
+      recommendations: 'Consider seasonal and weather factors'
     };
   }
 }

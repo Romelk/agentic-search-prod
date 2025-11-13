@@ -24,6 +24,9 @@ repositories {
     maven {
         url "https://maven-central.storage.googleapis.com/repos/central/content/"
     }
+    maven {
+        url "https://maven.google.com"
+    }
 }
 
 dependencies {
@@ -34,7 +37,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-redis-reactive'
     
     // Google Cloud AI Platform
-    implementation 'com.google.cloud:google-cloud-aiplatform:1.70.0'
+    implementation 'com.google.cloud:google-cloud-aiplatform:3.35.0'
     implementation 'com.google.cloud:google-cloud-storage:2.8.0'
     
     // Protocol Buffers
@@ -52,6 +55,9 @@ dependencies {
     
     // Reactive Redis
     implementation 'io.lettuce:lettuce-core:6.3.0.RELEASE'
+    
+    // Caching
+    implementation 'com.github.ben-manes.caffeine:caffeine:3.1.8'
     
     // Logging
     implementation 'net.logstash.logback:logstash-logback-encoder:7.4'

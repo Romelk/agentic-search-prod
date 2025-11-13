@@ -11,6 +11,31 @@ export interface QueryIntent {
   tone: string;
   confidence: number;
   timestamp: number;
+  attributeSummary?: AttributeSummary;
+  clarificationSignals?: ClarificationSignals;
+}
+
+export interface AttributeSummary {
+  required: string[];
+  provided: string[];
+  missing: string[];
+  optional?: string[];
+  inferred?: string[];
+  importanceWeights?: Record<string, number>;
+}
+
+export interface ClarificationSignals {
+  recommended: boolean;
+  confidence: number;
+  reasons: string[];
+  suggestedQuestions?: SuggestedClarification[];
+}
+
+export interface SuggestedClarification {
+  attribute: string;
+  questionType: string;
+  rationale: string;
+  priority: number;
 }
 
 export interface ClarificationRequest {
@@ -61,6 +86,7 @@ export interface AnalyzeIntentRequest {
 export interface AnalyzeIntentResponse {
   intent: QueryIntent;
   clarification: ClarificationRequest;
+  trace?: AgentTrace[];
 }
 
 export interface EnrichContextRequest {
@@ -69,6 +95,7 @@ export interface EnrichContextRequest {
 
 export interface EnrichContextResponse {
   contextualQuery: ContextualQuery;
+  trace?: AgentTrace[];
 }
 
 export interface EnrichTrendsRequest {
@@ -77,6 +104,7 @@ export interface EnrichTrendsRequest {
 
 export interface EnrichTrendsResponse {
   trendEnrichedQuery: TrendEnrichedQuery;
+  trace?: AgentTrace[];
 }
 
 // Vertex AI Configuration
@@ -96,5 +124,13 @@ export interface CostMetrics {
   queryCount: number;
   killSwitchActive: boolean;
   lastReset: Date;
+}
+
+// Debug tracing
+export interface AgentTrace {
+  agent: string;
+  input: Record<string, unknown>;
+  output: Record<string, unknown>;
+  timestamp: number;
 }
 

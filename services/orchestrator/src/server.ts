@@ -36,6 +36,10 @@ const costLimiter = createCostLimiter({
   killSwitchEnv: 'VERTEX_AI_KILL_SWITCH'
 });
 
+// Get routing strategy from environment
+const ROUTING_STRATEGY = process.env.ROUTING_STRATEGY || 'two-path';
+console.log(`[Orchestrator] Routing strategy: ${ROUTING_STRATEGY}`);
+
 // Initialize LangGraph workflow
 const maestroGraph = createMaestroGraph();
 
@@ -151,6 +155,7 @@ app.post('/api/v1/search', async (req, res) => {
       estimatedCost,
       actualCost: 0,
       metadata: {
+        routingStrategy: ROUTING_STRATEGY,
         maxResults: maxResults.toString(),
         filters: JSON.stringify(filters),
         userContext: JSON.stringify(userContext)
@@ -163,6 +168,14 @@ app.post('/api/v1/search', async (req, res) => {
     // Record actual cost
     await costLimiter.recordCost(finalState.actualCost || estimatedCost);
 
+    logPerformanceSummary({
+      query,
+      requestId,
+      startTime,
+      estimatedCost,
+      finalState
+    });
+
     // Generate response
     const response = {
       uiResponse: finalState.finalResponse || {
@@ -170,13 +183,17 @@ app.post('/api/v1/search', async (req, res) => {
         executionTraces: finalState.executionTraces,
         queryId: requestId,
         totalExecutionTimeMs: Date.now() - startTime,
-        metadata: finalState.metadata,
+        metadata: {
+          ...finalState.metadata,
+          routingStrategy: ROUTING_STRATEGY
+        },
         success: !finalState.error,
         errorMessage: finalState.error
       },
       estimatedCost: finalState.estimatedCost,
       actualCost: finalState.actualCost || estimatedCost,
       requestId,
+      routingStrategy: ROUTING_STRATEGY,
       stateSummary: getStateSummary(finalState)
     };
 
@@ -280,6 +297,46 @@ async function checkServiceHealth(): Promise<Record<string, string>> {
   }
   
   return health;
+}
+
+interface PerformanceSummaryInput {
+  query: string;
+  requestId: string;
+  startTime: number;
+  estimatedCost: number;
+  finalState: OrchestratorState;
+}
+
+function logPerformanceSummary({
+  query,
+  requestId,
+  startTime,
+  estimatedCost,
+  finalState
+}: PerformanceSummaryInput) {
+  const totalTime = Date.now() - startTime;
+  const traces = finalState.executionTraces || [];
+  const successfulTraces = traces.filter(trace => trace.status === 'success');
+  const erroredTraces = traces.filter(trace => trace.status !== 'success');
+  const topAgents = successfulTraces
+    .slice()
+    .sort((a, b) => b.executionTimeMs - a.executionTimeMs)
+    .slice(0, 3)
+    .map(trace => `${trace.agentName}:${trace.executionTimeMs}ms`);
+
+  console.log(
+    `[Orchestrator][Metrics] Request ${requestId} | total=${totalTime}ms | ` +
+      `agents=${traces.length} | top=${topAgents.join(', ') || 'n/a'} | ` +
+      `estimatedCost=$${estimatedCost.toFixed(4)} | actualCost=$${(finalState.actualCost || estimatedCost).toFixed(4)}`
+  );
+
+  if (erroredTraces.length > 0) {
+    console.warn(
+      `[Orchestrator][Metrics] Request ${requestId} experienced errors in agents: ${erroredTraces
+        .map(trace => `${trace.agentName}(${trace.status})`)
+        .join(', ')}`
+    );
+  }
 }
 
 /**

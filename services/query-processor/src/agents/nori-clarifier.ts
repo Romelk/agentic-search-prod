@@ -60,7 +60,16 @@ export class NoriClarifier {
    * Determine if clarification is needed based on query intent
    */
   private shouldClarify(queryIntent: QueryIntent): boolean {
-    const { intentType, confidence, attributes, detectedEntities } = queryIntent;
+    const { intentType, confidence, attributes, detectedEntities, attributeSummary, clarificationSignals } = queryIntent;
+
+    if (clarificationSignals) {
+      if (clarificationSignals.recommended) {
+        return true;
+      }
+      if (clarificationSignals.recommended === false && clarificationSignals.confidence >= 0.7) {
+        return false;
+      }
+    }
     
     // High confidence queries with specific attributes don't need clarification
     if (confidence > 0.8 && Object.keys(attributes).length >= 2) {
@@ -75,20 +84,26 @@ export class NoriClarifier {
     // Product searches with missing key information need clarification
     if (intentType === 'product_search') {
       const category = attributes.category;
-      
-      if (!category) return true; // No category specified
-      
-      // Category-specific requirements
-      if (category === 'clothing' && !attributes.size && !attributes.occasion) {
-        return true;
-      }
-      
-      if (category === 'electronics' && !attributes.brand && !attributes.price_range) {
-        return true;
-      }
-      
-      if (category === 'home' && !attributes.room && !attributes.style) {
-        return true;
+      if (!category) return true;
+
+      if (attributeSummary) {
+        const hasMissingHighImportance = attributeSummary.missing.some(attr => {
+          const weight = attributeSummary.importanceWeights?.[attr] ?? 0.5;
+          return weight >= 0.6;
+        });
+        if (hasMissingHighImportance) {
+          return true;
+        }
+      } else {
+        if (category === 'clothing' && !attributes.size && !attributes.occasion) {
+          return true;
+        }
+        if (category === 'electronics' && !attributes.brand && !attributes.price_range) {
+          return true;
+        }
+        if (category === 'home' && !attributes.room && !attributes.style) {
+          return true;
+        }
       }
     }
     
@@ -112,7 +127,7 @@ export class NoriClarifier {
     queryIntent: QueryIntent, 
     userContext: Record<string, string>
   ): string {
-    const { intentType, attributes, detectedEntities, confidence } = queryIntent;
+    const { intentType, attributes, detectedEntities, confidence, attributeSummary, clarificationSignals } = queryIntent;
     
     return `You are Nori, an expert at generating helpful clarification questions for e-commerce searches. 
 
@@ -123,6 +138,15 @@ Query Analysis:
 - Confidence: ${confidence}
 - Detected Entities: ${detectedEntities.join(', ')}
 - Extracted Attributes: ${JSON.stringify(attributes)}
+- Attribute Summary: ${JSON.stringify(attributeSummary || {
+      required: [],
+      provided: Object.keys(attributes || {}),
+      missing: []
+    })}
+- Clarification Signals: ${JSON.stringify(clarificationSignals || {
+      recommended: false,
+      reasons: []
+    })}
 - User Context: ${JSON.stringify(userContext)}
 
 Guidelines:
@@ -204,11 +228,13 @@ Respond ONLY with valid JSON, no additional text.`;
    * Fallback clarification using rule-based approach
    */
   private fallbackClarification(queryIntent: QueryIntent): ClarificationRequest {
-    const { attributes, confidence } = queryIntent;
+    const { attributes, confidence, attributeSummary, clarificationSignals } = queryIntent;
     const questions: DynamicQuestion[] = [];
 
+    const missing = attributeSummary?.missing || [];
+
     // Budget question for most product searches
-    if (confidence < 0.7 || !attributes.price_range) {
+    if (confidence < 0.7 || (!attributes.price_range && missing.includes('price_range'))) {
       questions.push({
         question: 'What\'s your budget range?',
         questionType: 'budget',
@@ -221,7 +247,7 @@ Respond ONLY with valid JSON, no additional text.`;
 
     // Category-specific questions
     if (attributes.category === 'clothing') {
-      if (!attributes.size) {
+      if (!attributes.size && (missing.length === 0 || missing.includes('size'))) {
         questions.push({
           question: 'What size are you looking for?',
           questionType: 'size',
@@ -232,7 +258,18 @@ Respond ONLY with valid JSON, no additional text.`;
         });
       }
       
-      if (!attributes.occasion) {
+      if (!attributes.color && (missing.length === 0 || missing.includes('color'))) {
+        questions.push({
+          question: 'Do you have a preferred color?',
+          questionType: 'color',
+          options: ['No preference', 'Black', 'White', 'Blue', 'Red', 'Green'],
+          contextExplanation: 'Color helps us match your style preferences',
+          required: false,
+          priority: 2
+        });
+      }
+
+      if (!attributes.occasion && (missing.length === 0 || missing.includes('occasion'))) {
         questions.push({
           question: 'What occasion is this for?',
           questionType: 'occasion',
@@ -253,6 +290,21 @@ Respond ONLY with valid JSON, no additional text.`;
         required: false,
         priority: 2
       });
+    }
+
+    if (clarificationSignals?.suggestedQuestions) {
+      clarificationSignals.suggestedQuestions
+        .filter(sq => !questions.some(q => q.questionType === sq.questionType))
+        .forEach((sq) => {
+          questions.push({
+            question: `Could you share your preference for ${sq.attribute}?`,
+            questionType: sq.questionType || sq.attribute,
+            options: ['No preference'],
+            contextExplanation: sq.rationale || 'This helps us narrow down the best options',
+            required: false,
+            priority: Math.max(1, Math.min(5, sq.priority))
+          });
+        });
     }
 
     return {

@@ -1,0 +1,79 @@
+### Backend API Testing - HTTP Requests
+### Use with VS Code REST Client extension or similar
+
+@baseUrl = http://localhost:3003
+
+### 1. Health Check
+GET {{baseUrl}}/health
+Content-Type: application/json
+
+### 2. API Information
+GET {{baseUrl}}/
+
+### 3. Simple Search - Blue Dress
+POST {{baseUrl}}/api/v1/search
+Content-Type: application/json
+
+{
+  "query": "blue dress",
+  "maxResults": 3
+}
+
+### 4. Search with Color Filter
+POST {{baseUrl}}/api/v1/search
+Content-Type: application/json
+
+{
+  "query": "shirt",
+  "filters": {
+    "color": "blue",
+    "priceRange": [50, 100]
+  },
+  "maxResults": 5
+}
+
+### 5. Search with Budget Filter
+POST {{baseUrl}}/api/v1/search
+Content-Type: application/json
+
+{
+  "query": "dress",
+  "filters": {
+    "priceRange": [100, 200]
+  },
+  "maxResults": 5
+}
+
+### 6. Search with Occasion Filter
+POST {{baseUrl}}/api/v1/search
+Content-Type: application/json
+
+{
+  "query": "outfit",
+  "filters": {
+    "occasion": "party"
+  },
+  "maxResults": 5
+}
+
+### 7. Complex Query - Needs Clarification
+POST {{baseUrl}}/api/v1/search
+Content-Type: application/json
+
+{
+  "query": "help me choose a party outfit",
+  "maxResults": 10
+}
+
+### 8. Shirt Query (should generate questions)
+POST {{baseUrl}}/api/v1/search
+Content-Type: application/json
+
+{
+  "query": "shirt",
+  "maxResults": 5
+}
+
+
+
+

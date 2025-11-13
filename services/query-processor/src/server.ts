@@ -29,6 +29,8 @@ import {
   EnrichContextResponse,
   EnrichTrendsRequest,
   EnrichTrendsResponse,
+  ClarificationRequest,
+  QueryIntent,
   VertexAIConfig 
 } from './types';
 
@@ -38,6 +40,8 @@ dotenv.config();
 // Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 8081;
+const INTENT_CACHE_TTL_MS = parseInt(process.env.INTENT_CACHE_TTL_MS || '60000', 10);
+const INTENT_CACHE_MAX_ENTRIES = parseInt(process.env.INTENT_CACHE_MAX_ENTRIES || '200', 10);
 
 // Middleware
 app.use(helmet());
@@ -66,6 +70,27 @@ const ivyInterpreter = createIvyInterpreter(vertexAIClient);
 const noriClarifier = createNoriClarifier(vertexAIClient);
 const galeContextKeeper = createGaleContextKeeper(vertexAIClient);
 const vogueTrendWhisperer = createVogueTrendWhisperer(vertexAIClient);
+
+const toErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return 'Unknown error';
+  }
+};
+
+interface IntentCacheEntry {
+  timestamp: number;
+  response: AnalyzeIntentResponse;
+}
+
+const intentCache = new Map<string, IntentCacheEntry>();
 
 /**
  * Health check endpoint
@@ -109,7 +134,7 @@ app.get('/health', async (req, res) => {
     res.status(500).json({
       status: 'unhealthy',
       timestamp: Date.now(),
-      error: error.message
+      error: toErrorMessage(error)
     });
   }
 });
@@ -120,6 +145,8 @@ app.get('/health', async (req, res) => {
 app.post('/api/v1/analyze-intent', async (req, res) => {
   try {
     const request: AnalyzeIntentRequest = req.body;
+    const debug = String(req.query.debug || req.header('X-Debug') || '') === '1';
+    const trace: any[] = [];
     
     if (!request.query || typeof request.query !== 'string') {
       return res.status(400).json({
@@ -130,19 +157,50 @@ app.post('/api/v1/analyze-intent', async (req, res) => {
 
     console.log(`[QueryProcessor] Analyzing intent for: "${request.query}"`);
 
+    if (!debug) {
+      const cacheKey = buildIntentCacheKey(request);
+      const cached = getIntentCache(cacheKey);
+      if (cached) {
+        res.setHeader('X-Intent-Cache', 'HIT');
+        console.log(`[QueryProcessor] Cache hit for "${request.query}"`);
+        return res.json(cached);
+      }
+    }
+
     // Step 1: Analyze query intent with Ivy
     const queryIntent = await ivyInterpreter.analyzeQueryIntent(request);
+    if (debug) {
+      trace.push({
+        agent: 'Ivy',
+        input: { query: request.query, userContext: request.userContext || {} },
+        output: queryIntent,
+        timestamp: Date.now()
+      });
+    }
     
     // Step 2: Generate clarification questions with Nori
     const clarificationRequest = await noriClarifier.generateClarificationQuestions(
       queryIntent, 
       request.userContext || {}
     );
+    if (debug) {
+      trace.push({
+        agent: 'Nori',
+        input: { intent: queryIntent, userContext: request.userContext || {} },
+        output: clarificationRequest,
+        timestamp: Date.now()
+      });
+    }
 
     const response: AnalyzeIntentResponse = {
       intent: queryIntent,
       clarification: clarificationRequest
     };
+    if (debug) (response as any).trace = trace;
+
+    if (!debug) {
+      storeIntentCache(buildIntentCacheKey(request), response);
+    }
 
     console.log(`[QueryProcessor] Intent analysis complete: ${queryIntent.intentType}, needs clarification: ${clarificationRequest.needsClarification}`);
 
@@ -152,10 +210,95 @@ app.post('/api/v1/analyze-intent', async (req, res) => {
     console.error('[QueryProcessor] Intent analysis failed:', error);
     res.status(500).json({
       error: 'Intent analysis failed',
-      message: error.message
+      message: toErrorMessage(error)
     });
   }
 });
+
+function buildIntentCacheKey(request: AnalyzeIntentRequest): string {
+  const normalizedQuery = request.query.trim().toLowerCase();
+  const context = request.userContext ? stableStringify(request.userContext) : '';
+  return `${normalizedQuery}::${context}`;
+}
+
+function stableStringify(value: Record<string, unknown>): string {
+  const ordered = Object.keys(value || {})
+    .sort()
+    .reduce<Record<string, unknown>>((acc, key) => {
+      acc[key] = value[key];
+      return acc;
+    }, {});
+  return JSON.stringify(ordered);
+}
+
+function getIntentCache(key: string): AnalyzeIntentResponse | null {
+  const entry = intentCache.get(key);
+  if (!entry) return null;
+
+  if (Date.now() - entry.timestamp > INTENT_CACHE_TTL_MS) {
+    intentCache.delete(key);
+    return null;
+  }
+
+  // Return a shallow copy to avoid downstream mutation
+  return cloneAnalyzeIntentResponse(entry.response);
+}
+
+function storeIntentCache(key: string, response: AnalyzeIntentResponse) {
+  pruneIntentCache();
+  intentCache.set(key, {
+    timestamp: Date.now(),
+    response: cloneAnalyzeIntentResponse(response)
+  });
+}
+
+function pruneIntentCache() {
+  const now = Date.now();
+  for (const [key, entry] of intentCache.entries()) {
+    if (now - entry.timestamp > INTENT_CACHE_TTL_MS) {
+      intentCache.delete(key);
+    }
+  }
+
+  if (intentCache.size <= INTENT_CACHE_MAX_ENTRIES) {
+    return;
+  }
+
+  const entries = Array.from(intentCache.entries());
+  entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+  while (intentCache.size > INTENT_CACHE_MAX_ENTRIES) {
+    const oldest = entries.shift();
+    if (!oldest) break;
+    intentCache.delete(oldest[0]);
+  }
+}
+
+function cloneAnalyzeIntentResponse(response: AnalyzeIntentResponse): AnalyzeIntentResponse {
+  return {
+    intent: cloneQueryIntent(response.intent),
+    clarification: cloneClarification(response.clarification)
+  };
+}
+
+function cloneQueryIntent(intent: QueryIntent): QueryIntent {
+  return {
+    ...intent,
+    detectedEntities: intent.detectedEntities ? [...intent.detectedEntities] : [],
+    attributes: { ...(intent.attributes || {}) }
+  };
+}
+
+function cloneClarification(clarification: ClarificationRequest): ClarificationRequest {
+  return {
+    ...clarification,
+    questions: clarification.questions
+      ? clarification.questions.map(question => ({
+          ...question,
+          options: question.options ? [...question.options] : []
+        }))
+      : []
+  };
+}
 
 /**
  * Enrich context (Gale)
@@ -163,6 +306,8 @@ app.post('/api/v1/analyze-intent', async (req, res) => {
 app.post('/api/v1/enrich-context', async (req, res) => {
   try {
     const request: EnrichContextRequest = req.body;
+    const debug = String(req.query.debug || req.header('X-Debug') || '') === '1';
+    const trace: any[] = [];
     
     if (!request.clarifiedQuery) {
       return res.status(400).json({
@@ -175,10 +320,19 @@ app.post('/api/v1/enrich-context', async (req, res) => {
 
     // Enrich with environmental context using Gale
     const contextualQuery = await galeContextKeeper.enrichContext(request.clarifiedQuery);
+    if (debug) {
+      trace.push({
+        agent: 'Gale',
+        input: { clarifiedQuery: request.clarifiedQuery },
+        output: contextualQuery,
+        timestamp: Date.now()
+      });
+    }
 
     const response: EnrichContextResponse = {
       contextualQuery
     };
+    if (debug) (response as any).trace = trace;
 
     console.log(`[QueryProcessor] Context enrichment complete: ${contextualQuery.season}, ${contextualQuery.weather}`);
 
@@ -188,7 +342,7 @@ app.post('/api/v1/enrich-context', async (req, res) => {
     console.error('[QueryProcessor] Context enrichment failed:', error);
     res.status(500).json({
       error: 'Context enrichment failed',
-      message: error.message
+      message: toErrorMessage(error)
     });
   }
 });
@@ -199,6 +353,8 @@ app.post('/api/v1/enrich-context', async (req, res) => {
 app.post('/api/v1/enrich-trends', async (req, res) => {
   try {
     const request: EnrichTrendsRequest = req.body;
+    const debug = String(req.query.debug || req.header('X-Debug') || '') === '1';
+    const trace: any[] = [];
     
     if (!request.contextualQuery) {
       return res.status(400).json({
@@ -211,10 +367,19 @@ app.post('/api/v1/enrich-trends', async (req, res) => {
 
     // Enrich with trend analysis using Vogue
     const trendEnrichedQuery = await vogueTrendWhisperer.enrichTrends(request.contextualQuery);
+    if (debug) {
+      trace.push({
+        agent: 'Vogue',
+        input: { contextualQuery: request.contextualQuery },
+        output: trendEnrichedQuery,
+        timestamp: Date.now()
+      });
+    }
 
     const response: EnrichTrendsResponse = {
       trendEnrichedQuery
     };
+    if (debug) (response as any).trace = trace;
 
     console.log(`[QueryProcessor] Trend analysis complete: ${trendEnrichedQuery.trendingStyles.length} trending styles`);
 
@@ -224,7 +389,7 @@ app.post('/api/v1/enrich-trends', async (req, res) => {
     console.error('[QueryProcessor] Trend analysis failed:', error);
     res.status(500).json({
       error: 'Trend analysis failed',
-      message: error.message
+      message: toErrorMessage(error)
     });
   }
 });
@@ -246,19 +411,21 @@ app.post('/api/v1/embeddings', async (req, res) => {
     console.log(`[QueryProcessor] Generating embeddings for ${texts.length} texts`);
 
     // Generate embeddings using Vertex AI
-    const result = await vertexAIClient.generateEmbeddings(texts);
+    const embeddings = await vertexAIClient.generateEmbeddings(texts);
 
     res.json({
-      embeddings: result.embeddings,
-      usage: result.usage,
-      cost: result.cost
+      embeddings,
+      usage: {
+        inputTexts: texts.length
+      },
+      cost: null
     });
 
   } catch (error) {
     console.error('[QueryProcessor] Embedding generation failed:', error);
     res.status(500).json({
       error: 'Embedding generation failed',
-      message: error.message
+      message: toErrorMessage(error)
     });
   }
 });
@@ -273,7 +440,7 @@ app.get('/api/v1/cost/metrics', async (req, res) => {
   } catch (error) {
     res.status(500).json({
       error: 'Failed to get cost metrics',
-      message: error.message
+      message: toErrorMessage(error)
     });
   }
 });

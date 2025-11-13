@@ -9,3 +9,6 @@ steps:
     ]
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/future-of-search/query-processor']
+
+
+

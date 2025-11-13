@@ -9,10 +9,10 @@
 
 package com.agenticsearch.vectorsearch.config;
 
-import com.google.cloud.aiplatform.v1.EndpointServiceClient;
-import com.google.cloud.aiplatform.v1.EndpointServiceSettings;
 import com.google.cloud.aiplatform.v1.MatchServiceClient;
 import com.google.cloud.aiplatform.v1.MatchServiceSettings;
+import com.google.cloud.aiplatform.v1.IndexEndpointServiceClient;
+import com.google.cloud.aiplatform.v1.IndexEndpointServiceSettings;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import org.slf4j.Logger;
@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -44,6 +45,9 @@ public class VertexAIConfig {
     @Value("${vertex-ai.deployed-index-id:}")
     private String deployedIndexId;
     
+    @Value("${vertex-ai.embeddings-model:text-embedding-005}")
+    private String embeddingsModel;
+    
     @Value("${vertex-ai.timeout-seconds:30}")
     private int timeoutSeconds;
     
@@ -51,27 +55,43 @@ public class VertexAIConfig {
      * Configure Vertex AI Endpoint Service Client
      */
     @Bean
-    public EndpointServiceClient endpointServiceClient() throws IOException {
-        logger.info("Initializing Vertex AI Endpoint Service Client for project: {}", projectId);
+    public IndexEndpointServiceClient endpointServiceClient() throws IOException {
+        logger.info("Initializing Vertex AI Index Endpoint Service Client for project: {}", projectId);
         
-        EndpointServiceSettings settings = EndpointServiceSettings.newBuilder()
+        IndexEndpointServiceSettings settings = IndexEndpointServiceSettings.newBuilder()
             .setEndpoint(String.format("%s-aiplatform.googleapis.com:443", region))
             .build();
         
-        return EndpointServiceClient.create(settings);
+        return IndexEndpointServiceClient.create(settings);
     }
     
     /**
      * Configure Vertex AI Match Service Client for vector search
      */
     @Bean
-    public MatchServiceClient matchServiceClient() throws IOException {
+    public MatchServiceClient matchServiceClient(IndexEndpointServiceClient endpointServiceClient) throws IOException {
         logger.info("Initializing Vertex AI Match Service Client for project: {}", projectId);
-        
+
+        String defaultEndpoint = String.format("%s-aiplatform.googleapis.com:443", region);
+        String targetEndpoint = defaultEndpoint;
+
+        try {
+            var indexEndpoint = endpointServiceClient.getIndexEndpoint(getEndpointResourceName());
+            String publicDomain = indexEndpoint.getPublicEndpointDomainName();
+            if (StringUtils.hasText(publicDomain)) {
+                targetEndpoint = publicDomain + ":443";
+                logger.info("Using Matching Engine public endpoint: {}", publicDomain);
+            } else {
+                logger.warn("Index endpoint {} has no public endpoint domain; falling back to {}", getEndpointResourceName(), defaultEndpoint);
+            }
+        } catch (Exception ex) {
+            logger.warn("Unable to resolve public endpoint domain, using default {}. Cause: {}", defaultEndpoint, ex.getMessage());
+        }
+
         MatchServiceSettings settings = MatchServiceSettings.newBuilder()
-            .setEndpoint(String.format("%s-aiplatform.googleapis.com:443", region))
+            .setEndpoint(targetEndpoint)
             .build();
-        
+
         return MatchServiceClient.create(settings);
     }
     
@@ -113,5 +133,22 @@ public class VertexAIConfig {
     public String getIndexId() { return indexId; }
     public String getDeployedIndexId() { return deployedIndexId; }
     public int getTimeoutSeconds() { return timeoutSeconds; }
+    public String getEmbeddingsModel() { return embeddingsModel; }
+    
+    /**
+     * Get the fully qualified model resource name for text embeddings
+     */
+    public String getEmbeddingsModelResourceName() {
+        return String.format("projects/%s/locations/%s/publishers/google/models/%s",
+            projectId, region, embeddingsModel);
+    }
+    
+    /**
+     * Build the REST endpoint URL for embeddings predict calls
+     */
+    public String getEmbeddingsPredictUrl() {
+        return String.format("https://%s-aiplatform.googleapis.com/v1/%s:predict",
+            region, getEmbeddingsModelResourceName());
+    }
 }
 

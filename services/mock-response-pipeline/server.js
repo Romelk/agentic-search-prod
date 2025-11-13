@@ -35,25 +35,77 @@ app.post('/api/v1/create-bundles', (req, res) => {
 
   // Create mock bundles
   const bundles = candidates.slice(0, 3).map((candidate, index) => {
-    // Handle both direct metadata and nested metadata formats
-    const metadata = candidate.metadata || candidate;
+    // Handle both SearchCandidate format (has product property) and metadata format
+    let productName, price, currency, styleTags, occasion, season;
+    
+    if (candidate.product && candidate.product.name) {
+      // SearchCandidate format
+      productName = candidate.product.name;
+      price = candidate.product.price;
+      currency = candidate.product.currency;
+      styleTags = candidate.product.styleTags;
+      occasion = candidate.product.occasion;
+      season = candidate.product.season;
+    } else {
+      // Metadata format
+      const metadata = candidate.metadata || candidate;
+      productName = metadata.name || 'Product';
+      price = metadata.price;
+      currency = metadata.currency;
+      styleTags = metadata.style_tags;
+      occasion = metadata.occasion;
+      season = metadata.season;
+    }
     
     return {
       id: `bundle-${index + 1}`,
-      name: `${metadata.name} Look`,
-      description: `Complete outfit featuring ${metadata.name}`,
+      name: `${productName} Look`,
+      description: `Complete outfit featuring ${productName}`,
       products: [candidate],
-      totalPrice: metadata.price,
-      currency: metadata.currency,
-      style: metadata.style_tags,
-      occasion: metadata.occasion,
-      season: metadata.season,
+      totalPrice: price,
+      currency: currency || 'USD',
+      style: styleTags,
+      occasion: occasion,
+      season: season,
       confidence: Math.random() * 0.3 + 0.7 // 0.7-1.0
     };
   });
 
   console.log(`[Mock Weave] Created ${bundles.length} bundles`);
   res.json({ bundles });
+});
+
+app.post('/api/v1/pipeline/bundles', (req, res) => {
+  console.log(`[Mock Weave] (pipeline) Creating bundles:`, req.body);
+
+  const {
+    searchCandidates = [],
+    styleThemes = [],
+    maxBundles = 5
+  } = req.body || {};
+
+  if (!searchCandidates.length) {
+    return res.json({ bundles: [] });
+  }
+
+  const themes = styleThemes.length > 0 ? styleThemes : ['casual', 'formal', 'mixed'];
+
+  const bundles = searchCandidates.slice(0, maxBundles).map((candidate, index) => {
+    const productName = candidate?.product?.name || `Product ${index + 1}`;
+    return {
+      bundle_id: `bundle-${index + 1}`,
+      bundle_name: `${productName} Look`,
+      items: [candidate],
+      coherence_score: candidate?.similarity_score || candidate?.similarityScore || 0.78,
+      style_theme: themes[index % themes.length],
+      description: `Mock pipeline bundle featuring ${productName}`
+    };
+  });
+
+  res.json({
+    bundles,
+    count: bundles.length
+  });
 });
 
 // Weave Composer - Create product bundles
@@ -110,6 +162,32 @@ app.post('/api/v1/rank-looks', (req, res) => {
 
   console.log(`[Mock Judge] Ranked ${rankedBundles.length} bundles`);
   res.json({ rankedBundles });
+});
+
+app.post('/api/v1/pipeline/rank', (req, res) => {
+  console.log(`[Mock Judge] (pipeline) Ranking bundles:`, req.body);
+
+  const { bundles = [], userPreferences = {}, maxResults = 5 } = req.body || {};
+  if (!bundles.length) {
+    return res.json({ rankedLooks: [] });
+  }
+
+  const rankedLooks = bundles.slice(0, maxResults).map((bundle, index) => ({
+    look: bundle,
+    finalScore: bundle?.coherence_score || bundle?.coherenceScore || 0.8,
+    scoreBreakdown: {
+      coherence: bundle?.coherence_score || bundle?.coherenceScore || 0.8,
+      style: 0.72,
+      price: 0.7,
+      trend: Object.keys(userPreferences || {}).length > 0 ? 0.75 : 0.65
+    },
+    rank: index + 1
+  }));
+
+  res.json({
+    rankedLooks,
+    count: rankedLooks.length
+  });
 });
 
 // Judge Ranker - Score and rank bundles
@@ -208,6 +286,61 @@ app.post('/api/v1/generate-response', (req, res) => {
     },
     success: true,
     errorMessage: null
+  });
+});
+
+app.post('/api/v1/pipeline/validate', (req, res) => {
+  console.log(`[Mock Aegis] (pipeline) Validating looks:`, req.body);
+
+  const { rankedLooks = [] } = req.body || {};
+  if (!rankedLooks.length) {
+    return res.json({
+      approvedLooks: [],
+      approvedCount: 0,
+      rejectedCount: 0
+    });
+  }
+
+  const approvedLooks = rankedLooks.filter((_, index) => index % 3 !== 0);
+  res.json({
+    approvedLooks,
+    approvedCount: approvedLooks.length,
+    rejectedCount: rankedLooks.length - approvedLooks.length
+  });
+});
+
+app.post('/api/v1/validate-looks', (req, res) => {
+  console.log(`[Mock Aegis] Validating looks (legacy):`, req.body);
+
+  const { rankedLooks = [] } = req.body || {};
+  const approvedLooks = rankedLooks.filter((_, index) => index % 2 === 0);
+
+  res.json({
+    approvedLooks,
+    approvedCount: approvedLooks.length,
+    rejectedCount: rankedLooks.length - approvedLooks.length
+  });
+});
+
+app.post('/api/v1/pipeline/explain', (req, res) => {
+  console.log(`[Mock Sage] (pipeline) Explaining looks:`, req.body);
+
+  const { rankedLooks = [], userQuery = '' } = req.body || {};
+  const explainedLooks = rankedLooks.map((look, index) => ({
+    look: look.look || look,
+    finalScore: look.finalScore || 0.8,
+    scoreBreakdown: look.scoreBreakdown || { coherence: 0.8 },
+    rank: look.rank || index + 1,
+    explanation: `Mock explanation for "${userQuery}" highlighting ${look.look?.bundleName || 'this look'}.`
+  }));
+
+  res.json({
+    explainedLooks,
+    count: explainedLooks.length,
+    success: true,
+    metadata: {
+      searchType: 'semantic-mock'
+    }
   });
 });
 

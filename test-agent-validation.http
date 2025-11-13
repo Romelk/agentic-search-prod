@@ -1,0 +1,80 @@
+### Agent Routing Strategy Validation Tests
+### Test both two-path and seven-path strategies
+
+@baseUrl = http://localhost:8080
+
+### 1. Get Current Routing Strategy
+GET {{baseUrl}}/health
+Content-Type: application/json
+
+### 2. Test Case 1: Word-based Search - "blue dress"
+# Expected Two-Path: Simple (3 agents: Ivy, Kiko, Sage)
+# Expected Seven-Path: Minimal (3 agents: Ivy, Kiko, Sage)
+POST {{baseUrl}}/api/v1/search
+Content-Type: application/json
+
+{
+  "query": "blue dress",
+  "maxResults": 3
+}
+
+### 3. Test Case 2: Goal-based Search (Occasion) - "dress for wedding"
+# Expected Two-Path: Complex (7 agents: all)
+# Expected Seven-Path: Context-Only (4 agents: Ivy, Gale, Kiko, Sage)
+POST {{baseUrl}}/api/v1/search
+Content-Type: application/json
+
+{
+  "query": "dress for wedding",
+  "maxResults": 3
+}
+
+### 4. Test Case 3: Goal-based Search (Multi-context) - "summer dress for beach wedding in July"
+# Expected Two-Path: Complex (7 agents: all)
+# Expected Seven-Path: Full (7 agents: all)
+POST {{baseUrl}}/api/v1/search
+Content-Type: application/json
+
+{
+  "query": "summer dress for beach wedding in July",
+  "maxResults": 3
+}
+
+### 5. Test Case 4: Seasonal Query - "summer dress"
+# Expected Two-Path: Complex (7 agents: all)
+# Expected Seven-Path: Trend-Only (5 agents: Ivy, Gale, Vogue, Kiko, Sage)
+POST {{baseUrl}}/api/v1/search
+Content-Type: application/json
+
+{
+  "query": "summer dress",
+  "maxResults": 3
+}
+
+### 6. Test Case 5: Outfit Query - "blue dress outfit"
+# Expected Two-Path: Complex (7 agents: all)
+# Expected Seven-Path: Bundling-Only (4 agents: Ivy, Kiko, Weave, Sage)
+POST {{baseUrl}}/api/v1/search
+Content-Type: application/json
+
+{
+  "query": "blue dress outfit",
+  "maxResults": 3
+}
+
+### 7. Extract Execution Traces (for validation)
+# Use this to verify agent counts and routing decisions
+POST {{baseUrl}}/api/v1/search
+Content-Type: application/json
+
+{
+  "query": "blue dress",
+  "maxResults": 3
+}
+
+###
+# Response validation:
+# - Check .routingStrategy matches expected strategy
+# - Check .uiResponse.executionTraces length matches expected agent count
+# - Check .uiResponse.executionTraces[].agentName matches expected agents
+

@@ -2,7 +2,9 @@
 import axios from 'axios';
 import { SearchResponse, RankedLook, LookBundle, SearchCandidate, Product, Question, AgentExecutionTrace } from '../types';
 
-const API_BASE_URL = 'http://localhost:3003';
+// Use Full Orchestrator (port 8080) when running with Full Orchestrator mode
+// Can be overridden with environment variable VITE_API_BASE_URL
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

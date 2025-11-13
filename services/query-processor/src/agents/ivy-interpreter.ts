@@ -9,7 +9,12 @@
  */
 
 import { VertexAIClient } from '../vertexai/client';
-import { QueryIntent, AnalyzeIntentRequest } from '../types';
+import {
+  QueryIntent,
+  AnalyzeIntentRequest,
+  AttributeSummary,
+  ClarificationSignals
+} from '../types';
 
 export class IvyInterpreter {
   private vertexAIClient: VertexAIClient;
@@ -71,7 +76,22 @@ Please analyze this query and respond with a JSON object containing:
   },
   "tone": "casual|formal|urgent|exploratory",
   "confidence": 0.95,
-  "missingInformation": ["color", "size", "budget"],
+  "attributeSummary": {
+    "required": ["category","color","size"],
+    "provided": ["category"],
+    "missing": ["color","size"],
+    "optional": ["price_range","style","occasion"],
+    "importanceWeights": {"color":0.8,"size":0.9,"price_range":0.5}
+  },
+  "clarificationSignals": {
+    "recommended": true,
+    "confidence": 0.7,
+    "reasons": ["Key apparel attributes missing (color, size)", "User intent could be misinterpreted"],
+    "suggestedQuestions": [
+      {"attribute":"size","questionType":"size","rationale":"Fit is essential for clothing","priority":1},
+      {"attribute":"color","questionType":"color","rationale":"User did not specify a color preference","priority":2}
+    ]
+  },
   "complexity": "simple|medium|complex",
   "reasoning": "Brief explanation of your analysis"
 }
@@ -80,6 +100,7 @@ Guidelines:
 - Be precise with intentType classification
 - Extract ALL relevant entities and attributes
 - Identify what information is missing for a complete search
+- Tailor attributeSummary.required to the detected category (e.g., clothing needs color & size, electronics need brand or specs)
 - Assess confidence based on query clarity
 - Consider user context when available
 - Respond ONLY with valid JSON, no additional text.`;
@@ -93,7 +114,8 @@ Guidelines:
       // Handle undefined or null response
       if (!response || typeof response !== 'string') {
         console.log('[Ivy] Invalid response format, using fallback');
-        return this.createFallbackIntent(originalQuery);
+        return this.fallbackIntentAnalysis(originalQuery);
+      return this.fallbackIntentAnalysis(originalQuery);
       }
 
       // Extract JSON from response (handle cases where AI adds extra text)
@@ -112,6 +134,8 @@ Guidelines:
         tone: parsed.tone || 'neutral',
         confidence: Math.max(0, Math.min(1, parsed.confidence || 0.5)),
         timestamp: Date.now(),
+        attributeSummary: this.normalizeAttributeSummary(parsed.attributeSummary),
+        clarificationSignals: this.normalizeClarificationSignals(parsed.clarificationSignals),
       };
       
     } catch (error) {
@@ -184,6 +208,9 @@ Guidelines:
     if (attributes.category) confidence += 0.3;
     if (attributes.color) confidence += 0.2;
     
+    const attributeSummary = this.buildAttributeSummary(attributes);
+    const clarificationSignals = this.deriveClarificationSignals(intentType, confidence, attributeSummary);
+
     return {
       originalQuery: query,
       intentType,
@@ -192,6 +219,124 @@ Guidelines:
       tone: 'neutral',
       confidence: Math.min(confidence, 0.9),
       timestamp: Date.now(),
+      attributeSummary,
+      clarificationSignals,
+    };
+  }
+
+  private normalizeAttributeSummary(summary: any): AttributeSummary | undefined {
+    if (!summary || typeof summary !== 'object') {
+      return undefined;
+    }
+    return {
+      required: Array.isArray(summary.required) ? summary.required : [],
+      provided: Array.isArray(summary.provided) ? summary.provided : [],
+      missing: Array.isArray(summary.missing) ? summary.missing : [],
+      optional: Array.isArray(summary.optional) ? summary.optional : undefined,
+      inferred: Array.isArray(summary.inferred) ? summary.inferred : undefined,
+      importanceWeights: summary.importanceWeights && typeof summary.importanceWeights === 'object'
+        ? summary.importanceWeights
+        : undefined
+    };
+  }
+
+  private normalizeClarificationSignals(signals: any): ClarificationSignals | undefined {
+    if (!signals || typeof signals !== 'object') {
+      return undefined;
+    }
+    return {
+      recommended: Boolean(signals.recommended),
+      confidence: Math.max(0, Math.min(1, typeof signals.confidence === 'number' ? signals.confidence : 0.5)),
+      reasons: Array.isArray(signals.reasons) ? signals.reasons : [],
+      suggestedQuestions: Array.isArray(signals.suggestedQuestions)
+        ? signals.suggestedQuestions.map((item: any, index: number) => ({
+            attribute: item.attribute || item.questionType || 'general',
+            questionType: item.questionType || 'general',
+            rationale: item.rationale || '',
+            priority: Math.max(1, Math.min(5, item.priority || index + 1))
+          }))
+        : undefined
+    };
+  }
+
+  private buildAttributeSummary(attributes: Record<string, string>): AttributeSummary {
+    const provided = Object.keys(attributes || {}).filter(key => attributes[key]);
+    const summary: AttributeSummary = {
+      required: [],
+      provided,
+      missing: [],
+      optional: [],
+      importanceWeights: {}
+    };
+
+    const category = attributes.category;
+    if (category === 'clothing') {
+      summary.required.push('color', 'size');
+      summary.optional?.push('occasion', 'style', 'price_range');
+      summary.importanceWeights = { color: 0.8, size: 0.9, occasion: 0.5, style: 0.4, price_range: 0.3 };
+    } else if (category === 'electronics') {
+      summary.required.push('brand', 'price_range');
+      summary.optional?.push('features', 'usage');
+      summary.importanceWeights = { brand: 0.7, price_range: 0.6, features: 0.5 };
+    } else if (category === 'home') {
+      summary.required.push('room', 'style');
+      summary.optional?.push('material', 'color');
+      summary.importanceWeights = { room: 0.7, style: 0.6, material: 0.4, color: 0.4 };
+    } else {
+      summary.required.push('category');
+      summary.optional?.push('price_range', 'brand');
+      summary.importanceWeights = { category: 0.7, price_range: 0.4, brand: 0.4 };
+    }
+
+    summary.missing = summary.required.filter(attr => !provided.includes(attr));
+    return summary;
+  }
+
+  private deriveClarificationSignals(
+    intentType: string,
+    confidence: number,
+    attributeSummary: AttributeSummary
+  ): ClarificationSignals {
+    const missingCount = attributeSummary.missing.length;
+    const highImportanceMissing = attributeSummary.missing.some(attr => {
+      const weight = attributeSummary.importanceWeights?.[attr] ?? 0.5;
+      return weight >= 0.6;
+    });
+
+    const recommended =
+      intentType === 'comparison' ||
+      intentType === 'recommendation' ||
+      confidence < 0.5 ||
+      (missingCount > 0 && highImportanceMissing);
+
+    const reasons: string[] = [];
+    if (confidence < 0.5) {
+      reasons.push('Low confidence in understanding the request');
+    }
+    if (highImportanceMissing) {
+      reasons.push('Key attributes required for this category are missing');
+    }
+    if (intentType === 'comparison') {
+      reasons.push('Comparison queries need clarification on compared items');
+    }
+    if (intentType === 'recommendation') {
+      reasons.push('Recommendations benefit from preferences (style, budget, etc.)');
+    }
+
+    const suggestedQuestions: ClarificationSignals['suggestedQuestions'] = attributeSummary.missing.map(
+      (attr, index) => ({
+        attribute: attr,
+        questionType: attr,
+        rationale: `Clarify ${attr} to narrow the search`,
+        priority: index + 1
+      })
+    );
+
+    return {
+      recommended,
+      confidence: recommended ? Math.max(0.5, 1 - confidence / 2) : Math.max(0, Math.min(1, confidence)),
+      reasons,
+      suggestedQuestions: suggestedQuestions.length > 0 ? suggestedQuestions : undefined
     };
   }
 }
