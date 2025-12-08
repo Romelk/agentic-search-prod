@@ -11,7 +11,7 @@ const { PredictionServiceClient } = require('@google-cloud/aiplatform').v1;
 // Configuration
 const PROJECT_ID = 'future-of-search';
 const LOCATION = 'us-central1';
-const BUCKET_NAME = 'future-of-search-products';
+const BUCKET_NAME = 'future-of-search-matching-engine-us-central1';
 const EMBEDDING_MODEL = 'text-embedding-005';
 
 // Initialize Vertex AI client
@@ -131,7 +131,7 @@ async function generateEmbeddings() {
     
     // Upload embeddings
     await bucket.upload(embeddingsPath, {
-      destination: 'embeddings/embeddings.json',
+      destination: 'matching-engine/data/embeddings.json',
       metadata: {
         cacheControl: 'public, max-age=31536000',
       },
@@ -139,13 +139,13 @@ async function generateEmbeddings() {
     
     // Upload Matching Engine data
     await bucket.upload(matchingEnginePath, {
-      destination: 'embeddings/matching-engine-data.json',
+      destination: 'matching-engine/data/matching-engine-data.json',
       metadata: {
         cacheControl: 'public, max-age=31536000',
       },
     });
     
-    console.log(`✅ Uploaded to gs://${BUCKET_NAME}/embeddings/`);
+    console.log(`✅ Uploaded to gs://${BUCKET_NAME}/matching-engine/data/`);
     
   } catch (error) {
     console.log(`⚠️  Cloud Storage upload failed (bucket may not exist yet): ${error.message}`);

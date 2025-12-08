@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Configuration
-const BUCKET_NAME = 'future-of-search-products';
+const BUCKET_NAME = 'future-of-search-matching-engine-us-central1';
 const EMBEDDING_DIMENSION = 768; // text-embedding-005 dimension
 
 function generateMockEmbedding() {
@@ -105,7 +105,7 @@ async function generateMockEmbeddings() {
     
     // Upload embeddings
     await bucket.upload(embeddingsPath, {
-      destination: 'embeddings/embeddings.json',
+      destination: 'matching-engine/data/embeddings.json',
       metadata: {
         cacheControl: 'public, max-age=31536000',
       },
@@ -113,13 +113,13 @@ async function generateMockEmbeddings() {
     
     // Upload Matching Engine data
     await bucket.upload(matchingEnginePath, {
-      destination: 'embeddings/matching-engine-data.json',
+      destination: 'matching-engine/data/matching-engine-data.json',
       metadata: {
         cacheControl: 'public, max-age=31536000',
       },
     });
     
-    console.log(`✅ Uploaded to gs://${BUCKET_NAME}/embeddings/`);
+    console.log(`✅ Uploaded to gs://${BUCKET_NAME}/matching-engine/data/`);
     
   } catch (error) {
     console.log(`⚠️  Cloud Storage upload failed: ${error.message}`);

@@ -11,7 +11,7 @@ const { PredictionServiceClient } = require('@google-cloud/aiplatform');
 // Configuration
 const PROJECT_ID = 'future-of-search';
 const LOCATION = 'us-central1';
-const BUCKET_NAME = 'future-of-search-products';
+const BUCKET_NAME = 'future-of-search-matching-engine-us-central1';
 const EMBEDDING_MODEL = 'text-embedding-005';
 
 // Initialize clients
@@ -132,13 +132,13 @@ async function createMatchingEngineIndex() {
       
       // Upload Matching Engine data
       await bucket.upload(matchingEnginePath, {
-        destination: 'matching-engine/data.json',
+        destination: 'matching-engine/data/kiko-embeddings.json',
         metadata: {
           cacheControl: 'public, max-age=31536000',
         },
       });
       
-      console.log(`✅ Uploaded to gs://${BUCKET_NAME}/matching-engine/data.json`);
+      console.log(`✅ Uploaded to gs://${BUCKET_NAME}/matching-engine/data/kiko-embeddings.json`);
       
     } catch (error) {
       console.log(`⚠️  Cloud Storage upload failed: ${error.message}`);
@@ -153,13 +153,13 @@ async function createMatchingEngineIndex() {
     
     console.log(`📋 Index Name: ${indexName}`);
     console.log(`📋 Endpoint Name: ${endpointName}`);
-    console.log(`📋 Data URI: gs://${BUCKET_NAME}/matching-engine/data.json`);
+    console.log(`📋 Data URI: gs://${BUCKET_NAME}/matching-engine/data/`);
     console.log(`📋 Dimensions: 768`);
     
     // Create index using gcloud
     const createIndexCmd = `gcloud ai indexes create \
       --display-name="${indexName}" \
-      --metadata-file=<(echo '{"contentsDeltaUri": "gs://${BUCKET_NAME}/matching-engine/", "isCompleteOverwrite": false}' | base64) \
+      --metadata-file=<(echo '{"contentsDeltaUri": "gs://${BUCKET_NAME}/matching-engine/data/", "isCompleteOverwrite": false}' | base64) \
       --project=${PROJECT_ID} \
       --region=${LOCATION}`;
 
@@ -175,7 +175,7 @@ async function createMatchingEngineIndex() {
 
     console.log(`\n🎉 SUCCESS! Matching Engine setup complete!`);
     console.log(`📊 Generated ${embeddings.length} real embeddings for $${totalCost.toFixed(4)}`);
-    console.log(`📁 Data uploaded to gs://${BUCKET_NAME}/matching-engine/`);
+    console.log(`📁 Data uploaded to gs://${BUCKET_NAME}/matching-engine/data/`);
     console.log(`\n⚠️  Next steps:`);
     console.log(`   1. Run the gcloud commands above to create index and endpoint`);
     console.log(`   2. Note the index ID and endpoint ID for configuration`);
@@ -185,7 +185,7 @@ async function createMatchingEngineIndex() {
       embeddings,
       totalCost,
       dataPath: matchingEnginePath,
-      bucketPath: `gs://${BUCKET_NAME}/matching-engine/data.json`
+      bucketPath: `gs://${BUCKET_NAME}/matching-engine/data/kiko-embeddings.json`
     };
 
   } catch (error) {

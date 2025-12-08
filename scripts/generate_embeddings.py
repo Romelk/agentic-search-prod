@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+ #!/usr/bin/env python3
 
 import json
 from pathlib import Path
@@ -12,8 +12,10 @@ LOCATION = "us-central1"
 EMBEDDING_MODEL = "text-embedding-005"
 
 PRODUCTS_PATH = Path("services/mock-vector-search/products-demo.json")
-OUTPUT_PATH = Path("outputs/kiko-embeddings.jsonl")
-OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+OUTPUT_DIR = Path("outputs")
+JSONL_PATH = OUTPUT_DIR / "kiko-embeddings.jsonl"
+INGEST_PATH = OUTPUT_DIR / "kiko-embeddings.json"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def build_embedding_prompt(product: dict) -> str:
@@ -50,7 +52,6 @@ def build_numeric_metadata(product: dict) -> List[dict]:
             {
                 "namespace": "price",
                 "valueDouble": float(price),
-                "op": "LESS_THAN",
             }
         )
     if rating := product.get("rating"):
@@ -58,7 +59,6 @@ def build_numeric_metadata(product: dict) -> List[dict]:
             {
                 "namespace": "rating",
                 "valueDouble": float(rating),
-                "op": "GREATER_EQUAL",
             }
         )
     return numeric
@@ -69,7 +69,7 @@ def main():
     embedding_model = TextEmbeddingModel.from_pretrained(EMBEDDING_MODEL)
 
     products = json.loads(PRODUCTS_PATH.read_text())
-    with OUTPUT_PATH.open("w") as out:
+    with JSONL_PATH.open("w") as jsonl_out, INGEST_PATH.open("w") as ingest_out:
         for product in products:
             prompt = build_embedding_prompt(product)
             embedding = embedding_model.get_embeddings([prompt])[0]
@@ -89,9 +89,11 @@ def main():
                 },
             }
 
-            out.write(json.dumps(datapoint) + "\n")
+            json_line = json.dumps(datapoint)
+            jsonl_out.write(json_line + "\n")
+            ingest_out.write(json_line + "\n")
 
-    print(f"Wrote {len(products)} datapoints to {OUTPUT_PATH}")
+    print(f"Wrote {len(products)} datapoints to {JSONL_PATH} and {INGEST_PATH}")
 
 
 if __name__ == "__main__":

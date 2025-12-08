@@ -1,0 +1,9 @@
+config:
+  dimensions: 3
+  approximateNeighborsCount: 10
+  distanceMeasureType: DOT_PRODUCT_DISTANCE
+  algorithmConfig:
+    treeAhConfig:
+      leafNodeEmbeddingCount: 1000
+      leafNodesToSearchPercent: 7
+contentsDeltaUri: gs://future-of-search-matching-engine-us-central1/matching-engine/test/

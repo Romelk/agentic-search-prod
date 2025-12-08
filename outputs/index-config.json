@@ -10,5 +10,5 @@
       }
     }
   },
-  "contentsDeltaUri": "gs://future-of-search-matching-engine/matching-engine/kiko-embeddings.jsonl"
+  "contentsDeltaUri": "gs://future-of-search-matching-engine-us-central1/matching-engine/data/"
 }

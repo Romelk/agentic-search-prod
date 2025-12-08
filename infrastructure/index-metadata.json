@@ -1,5 +1,5 @@
 {
-  "contentsDeltaUri": "gs://future-of-search-products-central1/matching-engine/",
+  "contentsDeltaUri": "gs://future-of-search-matching-engine-us-central1/matching-engine/data/",
   "isCompleteOverwrite": false,
   "config": {
     "dimensions": 768,
